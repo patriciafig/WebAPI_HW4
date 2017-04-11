@@ -1,57 +1,31 @@
 var express = require('express');
-var usergrid = require('usergrid');
 var request = require('request');
-var bodyParser = require('body-parser');
-var jsonParser = bodyParser.json();
-
-
 var app = express();
-app.use(express.bodyParser());
-
+var usergrid = require('usergrid');
 
 var client = new usergrid.client({
-	URI: ' https://apibaas-trial.apigee.net/figueroap/sandbox',
-	orgName: 'figueroap',
-	appName: 'Sandbox',
-	logging : true
+    orgName: 'figueroap',
+	appName: 'sandbox'
 });
 
-//collects all movies
-app.get('/movies', function(req, res){
-  var rtrn = "";
-  var rqst = 'https://apibaas-trial.apigee.net/figueroap/sandbox/movies';
-	request({
-    url: rqst,
-    method: 'GET',
-		json: true
-		}, function(error, response, body){
-    			if(error) {
-        		console.log(error);
-    		} else {
-			if(body.error){
-			res.status(400).json(body)
-			}else{
-		
-        	for (var i = 0 ; i < body.entities.length ; i++){
-                delete body.entities[i].uuid;
-                delete body.entities[i].type;
-                delete body.entities[i].metadata;
-                delete body.entities[i].created;
-                delete body.entities[i].modified;
-    		}
-            }
-				var responseBody = {};
-	    		responseBody.status = "200";
-				responseBody.description = "GET for all movies worked";
-				responseBody.movies = body.entities;
-            res.json(responseBody);
-    			}
-				});
+app.get('/movies', function(req, res) {
+    var options = {
+        method: 'GET',
+        endpoint: 'movies/' + req.params.title
+    }
+    client.request(options, function(err, data) {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(data);
+        }
+    })    
 });
 
-// for a specific movie 
-app.get('/movies/:name', function(req, res){
+app.get('/movies/:name', function(req, res) {	
+
 	var rqst = 'https://apibaas-trial.apigee.net/figueroap/sandbox/movies/' + req.params.name;
+	
 	request({
 		url: rqst,
 		method: 'GET',
@@ -61,59 +35,59 @@ app.get('/movies/:name', function(req, res){
 						console.log(error);
 					} else {
           if(body.error){
-            res.status(400).json({"status" : "400", "description" : "Movie not found :( "});
+            res.status(400).json({"status" : "400", "description" : "Movie not in inventory "});
           }else{
 			var responseBody = {};
 			responseBody.status = "200";
-			responseBody.description = "GET for one movie worked!";
+			responseBody.description = "GET, retrieved one movie!";
 			responseBody.name = body.entities[0].name;
-			responseBody.releaseDate = body.entities[0].releaseDate;
-			responseBody.actors = body.entities[0].actors;
+			responseBody.releaseDate = body.entities[0].year;
+			responseBody.actors = body.entities[0].Actors;
 			res.json(responseBody);
 					}
         }
       });
+  
 });
 
-app.post('/movies', jsonParser, function(req, res){
-		if (req.body.name == undefined || req.body.releaseDate == undefined || req.body.actors == undefined){
-        res.status(400).send({"status" : "400", "description" : "Error. Need name, releaseDate, and actors[] in JSON body."});
-    } else {
-		    request({
-	         url: 'https://apibaas-trial.apigee.net/figueroap/sandbox/movies' ,
-	         method: 'POST',
-			     json: true,
-			     body: {
-				         "name" : req.body.name,
-				         "releaseDate" : req.body.releaseDate,
-				         "actors": req.body.actors
-			            }
-			     }, function(error, response, body){
-	    			     if(error) {
-	        		        console.log(error);
-	    			     } else {
-									 if (body.error){
-										 	res.status(400).json({"status" : "400", "description" : "duplicate movie error"});
-						 }else{
-						 	var responseBody = {};
-	    					responseBody.status = "200";
-							responseBody.description = "Successfully POSTed a movie";
-							responseBody.name = body.entities[0].name;
-							responseBody.releaseDate = body.entities[0].releaseDate;
-							responseBody.actors = body.entities[0].actors;
-							res.json(responseBody);
-									 }
-	    			     } 
-					});
-    }
+app.post('/movies', function(req, res) {
+    var options = {
+        method: 'POST',
+        endpoint: 'movies',
+        body: {
+            name: req.params.title,
+            title: req.params.title,
+            year: req.params.year,
+            "Actors": [
+                { name1: req.params.name1 },
+                { name2: req.params.name2 },
+                { name3: req.params.name3 },
+            ]
+        }
+    };
+    
+    client.request(options, function(err, data) {
+        if(err) {
+            res.send(err);
+        } else {
+            res.send('POST SUCCESSFUL\n');
+            res.send(data);
+        }
+    })
 });
 
-
-app.delete('/movies', function(req, res){
-  res.status(400).json({"status" : "400", "description" : "ERROR don't delete all movies"});
+app.delete('/movies/:title', function(req, res) {
+    var options = {
+        method:'DELETE',
+        endpoint:'movies/' + req.params.title
+    };
+    client.request(options, function (err, data) {
+        if (err) {
+            res.send(err);// Error - DELETE failed
+        } else {
+            res.send(data);
+        }
+    });
 });
 
-//collects requests
-
-app.listen(process.env.PORT || 9000);
-console.log('The server is running!');
+app.listen(3000);
